@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::anyhow;
 use tokio::io::AsyncReadExt;
 use tokio::sync::OnceCell;
@@ -5,6 +7,8 @@ use tower_lsp::lsp_types::Url;
 use tracing::{info, warn};
 use typst::diag::EcoString;
 use typst::syntax::package::{PackageSpec, PackageVersion};
+#[allow(unused_imports)]
+use typst::visualize::Path;
 
 use crate::workspace::package::manager::{ExternalPackageError, ExternalPackageResult};
 use crate::workspace::package::{FullFileId, Package};
@@ -42,8 +46,8 @@ impl ExternalPackageManager {
     // i.e. the paths `<config>/typst/` and `<cache>/typst/` should be customizable
     #[tracing::instrument]
     pub fn new() -> Self {
-        let user = dirs::data_dir()
-            .map(|path| path.join("typst/packages/"))
+        let user = dirs::data_dir().map(|path| path.join("typst/packages/"))
+            .xor(option_env!("TYPST_PACKAGE_PATH").map(PathBuf::from))
             .map(LocalProvider::new)
             .map(Box::new)
             .map(|provider| provider as Box<dyn ExternalPackageProvider>);
@@ -54,7 +58,8 @@ impl ExternalPackageManager {
             warn!("could not get user external package directory");
         }
 
-        let cache = dirs::cache_dir()
+        let cache = dirs::cache_dir().map(|path| path.join("typst/packages/"))
+            .xor(option_env!("TYPST_PACKAGE_CACHE_PATH").map(PathBuf::from))
             .map(|path| path.join("typst/packages/"))
             .map(LocalProvider::new);
 
